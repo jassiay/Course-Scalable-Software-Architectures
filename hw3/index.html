@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!-- for reference, see:
+  -- https://dev.to/luispa/lets-try-react-without-nodejs-3a7
+  -- https://reactjs.org/docs/hello-world.html
+  -->
+<html lang="en">
+
+<!-- CS310 Scalable Software Architectures HW3 -->
+<!-- Jing Jiang -->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>CS310 News Search Engine</title>
+  <script type="application/javascript" src="https://unpkg.com/react@16.0.0/umd/react.development.js"></script>
+  <script type="application/javascript" src="https://unpkg.com/react-dom@16.0.0/umd/react-dom.development.js"></script>
+  <script type="application/javascript" src="https://unpkg.com/babel-standalone@6.26.0/babel.js"></script>
+
+  <!-- Maybe you want to use bootstrap to make it pretty? -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <style>
+    em{font-weight: bolder}
+
+    .search-bar-big-text {
+        margin-top: 3em;
+        margin-bottom: 1em;
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: bold;
+    }
+
+    .news-title {
+        color: black;
+    }
+
+    .input-group {
+        z-index: 5;
+    }
+
+    .news-url {
+        color: green;
+        font-size: x-small;
+    }
+
+    .news-card {
+        border: none;
+        margin-left: 0;
+        padding-left: 0;
+    }
+
+    .search-btn {
+        margin-left: 1em;
+    }
+
+    .control-btn {
+        margin: 1em 2em 2em 0;
+    }
+
+    .match-words{
+        background-color: yellow;
+    }
+
+    .control-indicator {
+      font-family: 'Helvetica Neue', sans-serif;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+  <script type="text/babel">
+  // Obtain the root
+  const rootElement = document.getElementById('root')
+
+  class SearchApp extends React.Component {
+    constructor(props){
+      super(props);
+      this.state = {
+        results: [],
+        totalCount: 0,
+        query: '',
+        lang:null,
+        date:null,
+        offset: 0,
+        queryStr:'',
+        isResultEmpty:true,
+        matchWords:[],
+        curRes:0,
+        nextRes:0,
+      };
+
+      this.handleInput = this.handleInput.bind(this);
+      this.handleDate = this.handleDate.bind(this);
+      this.handleLang = this.handleLang.bind(this);
+      this.handlePrevPage = this.handlePrevPage.bind(this);
+      this.handleNextPage = this.handleNextPage.bind(this);
+      this.generateReqStr = this.generateReqStr.bind(this);
+      this.getResults = this.getResults.bind(this);
+    }
+
+    generateReqStr(){
+      let queryString = "http://ssa-hw2-backend.stevetarzia.com/api/search?query="+ encodeURI(this.state.query) + "&offset="+this.state.offset;
+
+      if (this.state.query!='') {
+        if (this.state.lang != null)
+          queryString += "&language=en";
+        if (this.state.date != null)
+          queryString += ("&date=" + this.state.date);
+      }
+
+      console.log(queryString);
+      this.setState((s) => ({queryStr:queryString, nextRes: s.nextRes + 1}),
+        () => this.getResults(this.state)
+      );
+    }
+
+    getResults(s){
+      fetch(this.state.queryStr)
+      .then(response => response.json())
+		  .then(json => {
+        this.setState((res) => {
+          if (res.curRes < s.nextRes){
+            if (json['total_results'] > 0){
+              return {totalCount:json['total_results'],
+                    results:json['articles'],
+                    matchWords:s.query.split(" "),
+                    curRes:s.nextRes,
+                    isResultEmpty:false
+                  };
+            } else {return {isResultEmpty:true,
+              curRes:s.nextRes};}
+          }
+        });
+      })
+      .catch(()=>{
+        this.setState({
+          isResultEmpty:true,
+          curRes:s.nextRes,
+        })})
+    }
+
+    handleInput(ev){
+      this.setState({
+        offset: 0,
+        query: ev.target.value,
+      },() => this.generateReqStr());
+    }
+
+    handleLang(ev){
+      if (ev.target.checked){
+        this.setState({
+          offset: 0,
+          lang: 'en',
+        },() => this.generateReqStr());
+      } else {
+        this.setState({
+          offset: 0,
+          lang: null,
+        },() => this.generateReqStr());
+      }
+    }
+
+    handleDate(ev){
+      this.setState({
+        offset: 0,
+        date: ev.target.value,
+      },() => this.generateReqStr());
+    }
+
+    handlePrevPage(){
+      this.setState((s) => {
+        if (s.offset>0) {
+          return {offset:s.offset-10}
+        }
+      },
+      () => this.generateReqStr());
+    }
+
+    handleNextPage(){
+      this.setState((s) => {
+        if (s.offset+10 < s.totalCount) {
+          return {offset:s.offset + 10}
+        }
+      },
+      () => this.generateReqStr());
+    }
+
+    render() {
+      return (
+        <div>
+          <div className="container">
+              <div className="row text-center search-bar-big-text">
+                  <div className="col-lg-8 col-xl-8 offset-lg-2 offset-xl-2">
+                      <h1>NEWS&#x1F4F0;STAND</h1>
+                  </div>
+              </div>
+              <div className="row">
+                  <div className="col-lg-8 col-xl-8 offset-lg-2 offset-xl-2">
+                    <div className="input-group">
+                      <input type="text" className="form-control" name="query" placeholder="Search for news. Results appear when typing." onChange={this.handleInput}/>
+                    </div>
+                  </div>
+              </div>
+              <div className="row">
+                  <div className="col-lg-2 col-xl-2">
+                    <h4 className="control-indicator">Filters</h4>
+                    <hr />
+                    <div className="control-indicator">Language</div>
+                    <div className="form-check">
+                        <input className="form-check-input" type="checkbox" name="language" value="Checkbox_value" onClick={this.handleLang} />
+                        <label className="form-check-label" htmlFor="defaultCheck1">
+                            English Only
+                        </label>
+                    </div>
+                    <br />
+                    <div className="control-indicator">Date</div>
+                    <input className="form-control" type="date" name="date" onChange={this.handleDate}/>
+                  </div>
+                  <div className="col-lg-10 col-xl-10">
+                    {this.state.isResultEmpty?
+                      <div></div> :
+                      <Results results = {this.state.results} matchWords = {this.state.matchWords} />}
+                    {!this.state.isResultEmpty && <button type="button" className="btn btn-outline-dark control-btn" onClick = {this.handlePrevPage}>Prev</button>}
+                    {!this.state.isResultEmpty && <button type="button" className="btn btn-outline-dark control-btn" onClick = {this.handleNextPage}>Next</button>}
+                  </div>
+              </div>
+          </div>
+      </div>
+      );
+    }
+  }
+
+
+  class Results extends React.Component{
+    constructor(props){
+      super(props);
+    }
+
+    mapResults(matchWords, record, i) {
+      let text = matchWords.map((word, index) =>{
+        let ind = record['txt'].toLowerCase().indexOf(word.toLowerCase());
+        let len = word.length;
+        return(
+          <div className="line" key={index}>
+            {record['txt'].slice(ind-100,ind)}
+            <span className='match-words'>{record['txt'].slice(ind,ind+len)}</span>
+            {record['txt'].slice(ind+len,ind+100)}...
+          </div>
+        );
+      });
+
+      return (
+        <div className="card news-card" key={i}>
+            <div className="card-body news-card">
+                <a href={record['url']}>
+                    <h5 className="card-title news-title">{record['title']}</h5>
+                </a>
+                <a href={record['url']}>
+                    <p className="card-subtitle news-url">{record['url']}</p>
+                </a>
+                <div className="card-text">
+                  {text}
+                </div>
+            </div>
+        </div>
+      );
+    }
+
+    render(){
+      let matchWords = this.props.matchWords;
+      let newsResults = this.props.results.map((record, i) => this.mapResults(matchWords, record, i));
+      return newsResults;
+    }
+  }
+
+  // Use the ReactDOM.render to show your component on the browser
+  ReactDOM.render(
+    <SearchApp />,
+    rootElement
+  )
+</script>
+
+
+</body>
+
+</html>
